@@ -28,7 +28,18 @@ router.get('/signup', function (req, res) {
 });
 
 router.get('/login', function (req, res) {
-  res.render('login');
+  let sessionInputData = req.session.inputData;
+  
+  if(!sessionInputData){
+    sessionInputData = {
+      hasError:false,
+      email:'',
+      password:''
+    };
+  }
+
+  req.session.inputData = null;
+  res.render('login',{inputData:sessionInputData});
 });
 
 router.post('/signup', async function (req, res) {
@@ -64,8 +75,18 @@ router.post('/signup', async function (req, res) {
     .findOne({email:enteredEmail});
 
   if(existingUser) {
-    console.log('User exists already');
-    return res.redirect('/signup');
+    req.session.inputData = {
+      hasError : true,
+      message : 'User exists already!',
+      email: enteredEmail,
+      confirmEmail: enteredConfirmEmail,
+      password: enteredPassword
+    };
+
+    req.session.save(function(){
+      res.redirect('/signup');
+    })
+    return;
   }
 
   const hashedPassword = await bcrypt.hash(enteredPassword, 12);
@@ -91,8 +112,17 @@ router.post('/login', async function (req, res) {
     .findOne({email: enteredEmail}); 
 
    if(!existingUser) {
-    console.log('could not login!');
-    return res.redirect('/login');
+    req.session.inputData = {
+      hasError : true,
+      message : 'Could not log you in - please check your credentials!',
+      email: enteredEmail,
+      password: enteredPassword
+    };
+
+    req.session.save(function(){
+      res.redirect('/login');
+    });
+    return;
    }
    
   const passwordsAreEqual =  await bcrypt.compare(
@@ -101,8 +131,16 @@ router.post('/login', async function (req, res) {
   ); // 비교 결고로 불린 값이 할당됨. 
 
   if(!passwordsAreEqual) {
-    console.log('Could not log in - passwords are not equal!');
-    return res.redirect('/login');
+    req.session.inputData = {
+      hasError : true,
+      message : 'Could not log you in - please check your credentials!',
+      email: enteredEmail,
+      password: enteredPassword
+    };
+    req.session.save(function(){
+      res.redirect('/login');
+    });
+    return;
   }
 
   req.session.user = { id:existingUser._id, email:existingUser.email};
@@ -113,14 +151,11 @@ router.post('/login', async function (req, res) {
 });
 
 router.get('/admin', function (req, res) {
-  if(!req.session.isAuthenticated){ // !req.session.user 로 대체 가능
+  if(!res.locals.isAuth){ // !req.session.user 로 대체 가능
     return res.status(401).render('401');
   }
-  console.log(req.session.user.id);
 
-  const user = db.getDb().collection('users').findOne({_id:req.session.user.id});
-
-  if(!user || !user.isAdmin){
+  if(!res.locals.isAdmin){
     return res.status(403).render('403');
   }
 
@@ -128,9 +163,10 @@ router.get('/admin', function (req, res) {
 });
 
 router.get('/profile', function (req, res) {
-  if(!req.session.isAuthenticated){ // !req.session.user 로 대체 가능
+  if(!res.locals.isAuth){ // !req.session.user 로 대체 가능
     return res.status(401).render('401');
   }
+  
   res.render('profile');
 });
 
