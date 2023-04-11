@@ -27,7 +27,10 @@ app.use(session({
   secret:'super-secret',
   resave: false,
   saveUninitialized: false,
-  store: sessionStore
+  store: sessionStore,
+  cookie: {
+    maxAge: 30 * 24 * 60 * 60 * 1000,
+  }
 }));
 
 app.use(demoRoutes);
